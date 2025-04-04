@@ -1,79 +1,115 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+import logging
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.types import InputFile
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
 
-BOT_TOKEN = "7564859488:AAFBjD2PdLDbaA1L76_TVVtIWU3165vW-gs"
-ADMIN_ID = 7733433677
+API_TOKEN = '7564859488:AAFBjD2PdLDbaA1L76_TVVtIWU3165vW-gs'
+ADMIN_ID = 7733433677  # Твій Telegram ID
 
-products = {
-    "Одноразки": [
-        {
-            "name": "ELF BAR 1500",
-            "desc": "Нікотин: 5%\nАкумулятор: 850 мАч\nСмаки:\n- Полуничний енергетик\n- Кисле яблуко\n- Виноградний енергетик\n- Ківі гуава маракуйя\n- Полуниця банан",
-            "price": "350 грн",
-            "photo": "https://i.ibb.co/dLZXpsP/elfbar.jpg"
-        },
-    ],
-    "Готові сольові рідини": [
-        {
-            "name": "ELFLIQ NIC SALTS 30мл.",
-            "desc": "Смаки:\n- Полуничне морозиво\n- Кола\n- Жасмин малина\n- Ананас лід\n- Подвійне яблуко",
-            "price": "329 грн",
-            "photo": "https://i.ibb.co/BgpvBTz/elfliq.jpg"
-        }
-    ],
-    "Картриджі": [
-        {
-            "name": "VAPORESSO XROS",
-            "desc": "Обʼєм: 2 мл\nОпір: 0.6 / 0.8 Ом\nСумісність: XROS MINI, 3, 3 MINI, 3 NANO, CUBE, 4 MINI, 4",
-            "price": "129 грн",
-            "photo": "https://i.ibb.co/8chRSb6/xros.jpg"
-        }
-    ],
-    "Перезаряджаємі одноразки": [
-        {
-            "name": "ELF BAR CR 5000",
-            "desc": "Смаки:\n- Лимонад Blue Razz\n- Журавлина виноградна\n- Кавун\n- Полуничне морозиво\n- Ківі Маракуйя Гуава",
-            "price": "579 грн",
-            "photo": "https://i.ibb.co/yfS8X1N/cr5000.jpg"
-        }
-    ],
-    "POD-Системи": [
-        {
-            "name": "Lost Vape URSA NANO S",
-            "desc": "Кольори: Mint Green, Violet Purple, Stone Grey\nКомплектація:\n- URSA NANO S\n- Картридж URSA 0.8 (2,5 ml)\n- Кабель Type-C\n- Інструкція",
-            "price": "999 грн",
-            "photo": "https://i.ibb.co/gM95n3n/ursa.jpg"
-        }
-    ]
-}
+logging.basicConfig(level=logging.INFO)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton(cat, callback_data=cat)] for cat in products]
-    await update.message.reply_text("Оберіть категорію товарів:", reply_markup=InlineKeyboardMarkup(keyboard))
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
+dp.middleware.setup(LoggingMiddleware())
 
-async def show_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    category = query.data
-    items = products.get(category, [])
-    for item in items:
-        text = f"**{item['name']}**\n{item['desc']}\nЦіна: {item['price']}"
-        buttons = [[InlineKeyboardButton("Замовити", callback_data=f"order_{item['name']}|{category}")]]
-        await query.message.reply_photo(photo=item['photo'], caption=text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode='Markdown')
+# --- Головне меню ---
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("POD-Системи", callback_data='pod'))
+    keyboard.add(types.InlineKeyboardButton("Сольова рідина", callback_data='salt'))
+    keyboard.add(types.InlineKeyboardButton("Картриджі", callback_data='cartridge'))
+    keyboard.add(types.InlineKeyboardButton("Перезаряджаємі", callback_data='rechargeable'))
+    keyboard.add(types.InlineKeyboardButton("Одноразки", callback_data='disposable'))
+    await message.answer("Оберіть категорію:", reply_markup=keyboard)
 
-async def handle_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    product_info = query.data.split("order_")[1]
-    product_name, category = product_info.split("|")
-    user = query.from_user
-    msg = f"Нове замовлення:\nТовар: {product_name}\nКатегорія: {category}\nВід користувача: @{user.username or user.first_name} (ID: {user.id})"
-    await context.bot.send_message(chat_id=ADMIN_ID, text=msg)
-    await query.message.reply_text("Дякуємо за замовлення! Ми зв'яжемося з вами.")
+# --- Повернення в головне меню ---
+@dp.callback_query_handler(lambda c: c.data == 'back_main')
+async def back_main(callback_query: types.CallbackQuery):
+    await send_welcome(callback_query.message)
 
+# --- Категорії ---
+@dp.callback_query_handler(lambda c: c.data == 'pod')
+async def show_pod(callback_query: types.CallbackQuery):
+    photo = InputFile("images/pod.jpg")
+    caption = (
+        "**Lost Vape URSA NANO S**\n"
+        "Колір: Mint Green, Violet Purple, Stone Grey\n\n"
+        "**Комплектація:**\n"
+        "- POD-Система URSA NANO S\n"
+        "- Картридж URSA 0.8 (2.5 мл)\n"
+        "- Кабель Type-C\n"
+        "- Інструкція\n"
+    )
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("Замовити", callback_data='order_pod'))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data='back_main'))
+    await bot.send_photo(callback_query.from_user.id, photo, caption=caption, parse_mode='Markdown', reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data == 'salt')
+async def show_salt(callback_query: types.CallbackQuery):
+    photo = InputFile("images/salt.jpg")
+    caption = (
+        "**ELFLIQ NIC SALTS 30мл.**\n"
+        "Смаки: Полуничне морозиво, Кола, Жасмин-малина, Ананас-лід, Подвійне яблуко\n"
+        "Ціна: *329 грн*"
+    )
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("Замовити", callback_data='order_salt'))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data='back_main'))
+    await bot.send_photo(callback_query.from_user.id, photo, caption=caption, parse_mode='Markdown', reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data == 'cartridge')
+async def show_cartridge(callback_query: types.CallbackQuery):
+    photo = InputFile("images/cartridge.jpg")
+    caption = (
+        "**Картриджі VAPORESSO XROS**\n"
+        "Обʼєм: 2 мл | Опір: 0.6 / 0.8 Ом\n"
+        "Підходить для:\n"
+        "- XROS MINI, XROS 3, XROS 3 MINI, XROS 4 тощо\n"
+        "Ціна: *129 грн*"
+    )
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("Замовити", callback_data='order_cartridge'))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data='back_main'))
+    await bot.send_photo(callback_query.from_user.id, photo, caption=caption, parse_mode='Markdown', reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data == 'rechargeable')
+async def show_rechargeable(callback_query: types.CallbackQuery):
+    photo = InputFile("images/rechargeable.jpg")
+    caption = (
+        "**ELF BAR CR5000**\n"
+        "Смаки: Лимонад Blue Razz, Журавлина-виноград, Кавун, Полуничне морозиво, Ківі-Маракуйя-Гуава\n"
+        "Ціна: *579 грн*"
+    )
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("Замовити", callback_data='order_cr5000'))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data='back_main'))
+    await bot.send_photo(callback_query.from_user.id, photo, caption=caption, parse_mode='Markdown', reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data == 'disposable')
+async def show_disposable(callback_query: types.CallbackQuery):
+    photo = InputFile("images/disposable.jpg")
+    caption = (
+        "**ELF BAR 1500**\n"
+        "Смаки: Полуничний енергетик, Кисле яблуко, Виноградний енергетик, Ківі-Гуава-Маракуйя, Полуниця-Банан\n"
+        "Ціна: *350 грн*"
+    )
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("Замовити", callback_data='order_disposable'))
+    keyboard.add(types.InlineKeyboardButton("Назад", callback_data='back_main'))
+    await bot.send_photo(callback_query.from_user.id, photo, caption=caption, parse_mode='Markdown', reply_markup=keyboard)
+
+# --- Обробка замовлень ---
+@dp.callback_query_handler(lambda c: c.data.startswith('order_'))
+async def handle_order(callback_query: types.CallbackQuery):
+    product = callback_query.data.split('_')[1]
+    await callback_query.answer("Дякуємо за замовлення! Ми з вами звʼяжемося.")
+    await bot.send_message(
+        ADMIN_ID,
+        f"Користувач @{callback_query.from_user.username or callback_query.from_user.id} зробив замовлення: {product.upper()}"
+    )
+
+# --- Запуск ---
 if __name__ == '__main__':
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(show_products, pattern="^(?!order_).*"))
-    app.add_handler(CallbackQueryHandler(handle_order, pattern="^order_"))
-    app.run_polling()
+    executor.start_polling(dp, skip_updates=True)
