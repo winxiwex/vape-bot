@@ -17,11 +17,11 @@ dp.middleware.setup(LoggingMiddleware())
 async def send_welcome(message: types.Message):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("POD-Системи", callback_data='pod'))
-    keyboard.add(types.InlineKeyboardButton("Сольова рідина", callback_data='salt'))
+    keyboard.add(types.InlineKeyboardButton("Готові сольові рідини", callback_data='salt'))
     keyboard.add(types.InlineKeyboardButton("Картриджі", callback_data='cartridge'))
-    keyboard.add(types.InlineKeyboardButton("Перезаряджаємі", callback_data='rechargeable'))
+    keyboard.add(types.InlineKeyboardButton("Перезаряджаємі одноразки", callback_data='rechargeable'))
     keyboard.add(types.InlineKeyboardButton("Одноразки", callback_data='disposable'))
-    await message.answer("Оберіть категорію:", reply_markup=keyboard)
+    await message.answer("Оберіть категорію товарів:", reply_markup=keyboard)
 
 # --- Повернення в головне меню ---
 @dp.callback_query_handler(lambda c: c.data == 'back_main')
